@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>实验公式不确定度推导工具 Pro</title>
+  <script src="https://cdn.jsdelivr.net/npm/mathjs@12.4.2/lib/browser/math.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: linear-gradient(135deg, #eef2ff, #f8fafc);
+      color: #111827;
+    }
+    .container {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 28px 16px 48px;
+    }
+    .hero, .card {
+      background: rgba(255,255,255,0.92);
+      border: 1px solid #e5e7eb;
+      border-radius: 24px;
+      box-shadow: 0 16px 42px rgba(15, 23, 42, 0.08);
+    }
+    .hero { padding: 26px; margin-bottom: 18px; }
+    h1 { margin: 0 0 10px; font-size: clamp(24px, 4vw, 34px); }
+    .subtitle { color: #4b5563; line-height: 1.75; margin: 0; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+    @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+    .card { padding: 20px; }
+    label { display: block; font-weight: 800; margin: 14px 0 8px; }
+    input, textarea, select {
+      width: 100%;
+      border: 1px solid #d1d5db;
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-size: 15px;
+      outline: none;
+      transition: 0.15s;
+      background: #fff;
+    }
+    input:focus, textarea:focus, select:focus {
+      border-color: #6366f1;
+      box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.14);
+    }
+    textarea { min-height: 92px; resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+    @media (max-width: 640px) { .row, .row3 { grid-template-columns: 1fr; } }
+    button {
+      border: none;
+      border-radius: 14px;
+      padding: 12px 16px;
+      font-weight: 850;
+      cursor: pointer;
+      transition: 0.15s;
+      font-size: 15px;
+    }
+    .primary { background: #4f46e5; color: white; }
+    .secondary { background: #eef2ff; color: #3730a3; }
+    .green { background: #dcfce7; color: #166534; }
+    .danger { background: #fee2e2; color: #991b1b; }
+    button:hover { transform: translateY(-1px); filter: brightness(0.98); }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+    .hint {
+      color: #6b7280;
+      font-size: 13px;
+      line-height: 1.6;
+      margin-top: 8px;
+    }
+    .var-list { display: grid; gap: 10px; margin-top: 10px; }
+    .var-item {
+      display: grid;
+      grid-template-columns: 76px 1fr 1fr;
+      gap: 10px;
+      align-items: center;
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      padding: 10px;
+    }
+    @media (max-width: 520px) { .var-item { grid-template-columns: 1fr; } .var-name { text-align: left !important; } }
+    .var-name { font-weight: 900; text-align: center; color: #4338ca; }
+    .cov-grid { display: grid; gap: 10px; margin-top: 10px; }
+    .cov-item {
+      display: grid;
+      grid-template-columns: 96px 1fr;
+      gap: 10px;
+      align-items: center;
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      border-radius: 14px;
+      padding: 10px;
+    }
+    .output {
+      min-height: 76px;
+      background: #f8fafc;
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      padding: 14px;
+      overflow-x: auto;
+      line-height: 1.75;
+    }
+    .error {
+      color: #b91c1c;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 14px;
+      padding: 12px;
+      display: none;
+      margin-top: 12px;
+    }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+    th, td { border-bottom: 1px solid #e5e7eb; padding: 9px 8px; text-align: left; vertical-align: top; }
+    th { background: #f9fafb; color: #374151; }
+    code { background: #eef2ff; color: #3730a3; padding: 2px 6px; border-radius: 6px; }
+    .small-title { margin: 0 0 12px; font-size: 19px; }
+    .footer-note { margin-top: 16px; color: #6b7280; font-size: 13px; line-height: 1.6; }
+    .badge { display:inline-block; background:#ecfeff; color:#155e75; border:1px solid #a5f3fc; padding:3px 8px; border-radius:999px; font-size:12px; margin-right:6px; }
+    .checkline { display:flex; align-items:center; gap:8px; margin-top:12px; color:#374151; }
+    .checkline input { width:auto; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <section class="hero">
+      <h1>实验公式不确定度推导工具 Pro</h1>
+      <p class="subtitle">
+        <span class="badge">支持 LaTeX 输入</span>
+        <span class="badge">支持协方差项</span>
+        <span class="badge">支持 Word 公式复制</span>
+        <span class="badge">支持导出 PNG / PDF</span>
+        <br>
+        输入实验计算公式，工具会自动识别变量，并根据误差传播公式生成合成标准不确定度表达式。适合物理实验、化学实验、工程测量和实验报告整理。
+      </p>
+    </section>
+
+    <div class="grid">
+      <section class="card">
+        <h2 class="small-title">1. 输入计算公式</h2>
+        <div class="row">
+          <div>
+            <label for="inputType">输入类型</label>
+            <select id="inputType" onchange="convertIfLatex()">
+              <option value="mathjs">普通表达式</option>
+              <option value="latex">LaTeX 公式</option>
+            </select>
+          </div>
+          <div>
+            <label for="mode">结果模式</label>
+            <select id="mode">
+              <option value="absolute">绝对不确定度 u(y)</option>
+              <option value="relative">相对不确定度 ur(y)</option>
+            </select>
+          </div>
+        </div>
+
+        <label for="formula">公式</label>
+        <textarea id="formula">y = \frac{m}{\rho V}</textarea>
+        <div class="hint">
+          LaTeX 示例：<code>y = \frac{m}{\rho V}</code>、<code>k = \frac{F}{x}</code>、<code>\gamma = \frac{kx}{2L}</code>。<br>
+          普通表达式示例：<code>y = m / (rho * V)</code>、<code>k = F / x</code>、<code>gamma = k*x/(2*L)</code>。
+        </div>
+
+        <label>LaTeX 转换后的普通表达式</label>
+        <div id="convertedOutput" class="output">等待转换……</div>
+
+        <div class="row">
+          <div>
+            <label for="roundDigits">数值结果保留位数</label>
+            <input id="roundDigits" type="number" min="1" max="12" value="6" />
+          </div>
+          <div>
+            <label for="covMode">变量相关性</label>
+            <select id="covMode" onchange="toggleCovariance()">
+              <option value="independent">变量独立</option>
+              <option value="covariance">加入协方差项</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="primary" onclick="analyzeFormula()">生成不确定度公式</button>
+          <button class="secondary" onclick="fillExample('density')">密度示例</button>
+          <button class="secondary" onclick="fillExample('spring')">劲度系数示例</button>
+          <button class="secondary" onclick="fillExample('surface')">表面张力示例</button>
+          <button class="danger" onclick="clearAll()">清空</button>
+        </div>
+        <div id="error" class="error"></div>
+      </section>
+
+      <section class="card">
+        <h2 class="small-title">2. 变量数值、不确定度与协方差</h2>
+        <div class="hint">先生成公式，再填写变量值和标准不确定度。若选择“加入协方差项”，可填写 cov(x,y)。</div>
+        <div id="variables" class="var-list"></div>
+        <div id="covarianceBox" style="display:none;">
+          <label>协方差项 cov(x,y)</label>
+          <div id="covariances" class="cov-grid"></div>
+          <div class="hint">若使用相关系数 r，可填：<code>cov(x,y)=r*u(x)*u(y)</code> 的数值结果。</div>
+        </div>
+        <div class="actions">
+          <button class="primary" onclick="calculateNumeric()">代入计算</button>
+        </div>
+      </section>
+    </div>
+
+    <section id="reportArea" class="card" style="margin-top:18px;">
+      <h2 class="small-title">3. 推导结果</h2>
+      <label>原始公式</label>
+      <div id="originOutput" class="output">等待输入公式……</div>
+
+      <label>合成标准不确定度公式</label>
+      <div id="uncertaintyOutput" class="output">等待生成……</div>
+
+      <label>Word 公式 / 线性公式文本</label>
+      <div id="wordOutput" class="output">等待生成……</div>
+
+      <label>各变量偏导数</label>
+      <div id="derivativeOutput" class="output">等待生成……</div>
+
+      <label>数值计算结果</label>
+      <div id="numericOutput" class="output">等待代入……</div>
+
+      <div class="actions">
+        <button class="secondary" onclick="copyPlainResult()">复制普通文本</button>
+        <button class="secondary" onclick="copyWordEquation()">复制 Word 公式</button>
+        <button class="green" onclick="exportPNG()">导出 PNG 图片</button>
+        <button class="green" onclick="exportPDF()">导出 PDF</button>
+      </div>
+      <p class="footer-note">
+        独立变量公式：u²(y)=Σ(∂y/∂xi · u(xi))²。若加入协方差项：u²(y)=Σ(∂y/∂xi · u(xi))² + 2Σ(∂y/∂xi)(∂y/∂xj)cov(xi,xj)。<br>
+        部署方法：把本文件保存为 <code>index.html</code>，上传到 GitHub Pages、Netlify、Vercel 或任意静态网站托管平台即可。手机浏览器可直接访问。
+      </p>
+    </section>
+  </div>
+
+  <script>
+    let state = {
+      lhs: 'y', rhs: '', variables: [], derivatives: {}, uncertaintyExpr: '', wordExpr: '', covPairs: []
+    };
+
+    const greekMap = {
+      '\\alpha': 'alpha', '\\beta': 'beta', '\\gamma': 'gamma', '\\delta': 'delta',
+      '\\epsilon': 'epsilon', '\\theta': 'theta', '\\lambda': 'lambda', '\\mu': 'mu',
+      '\\pi': 'pi', '\\rho': 'rho', '\\sigma': 'sigma', '\\omega': 'omega', '\\Delta': 'Delta'
+    };
+
+    function showError(message) {
+      const el = document.getElementById('error');
+      el.style.display = message ? 'block' : 'none';
+      el.textContent = message || '';
+    }
+
+    function preprocessLatex(latex) {
+      const BS = String.fromCharCode(92);
+      let s = latex.trim();
+
+      // 只替换真正的 LaTeX 命令，不对普通字符串做全局污染式替换
+      s = replaceLatexGreekCommands(s);
+      s = s.split(BS + 'left').join('').split(BS + 'right').join('');
+      s = s.split(BS + 'cdot').join('*').split(BS + 'times').join('*');
+      s = s.split(BS + 'ln').join('log').split(BS + 'log').join('log');
+      s = s.split(BS + 'sin').join('sin').split(BS + 'cos').join('cos').split(BS + 'tan').join('tan');
+      s = s.split(BS + 'exp').join('exp');
+
+      s = replaceLatexFractions(s);
+      s = replaceLatexSqrt(s);
+      s = normalizeLatexSubscripts(s);
+      s = s.split('{').join('(').split('}').join(')');
+      s = normalizeLatexSpacesAsMultiplication(s);
+      s = insertImplicitMultiplication(s);
+      return s;
+    }
+
+    function normalizeLatexSubscripts(s) {
+      // V_{1}、V_1、rho_{0}、rho_0 都统一保留为 math.js 可识别的变量名：V_1、rho_0
+      s = s.replace(/_\{([^{}]+)\}/g, '_$1');
+      s = s.replace(/_\(([^()]+)\)/g, '_$1');
+      return s;
+    }
+
+    function replaceLatexGreekCommands(s) {
+      const BS = String.fromCharCode(92);
+      const pairs = [
+        ['Delta', 'Delta'], ['alpha', 'alpha'], ['beta', 'beta'], ['gamma', 'gamma'],
+        ['delta', 'delta'], ['epsilon', 'epsilon'], ['theta', 'theta'], ['lambda', 'lambda'],
+        ['mu', 'mu'], ['rho', 'rho'], ['sigma', 'sigma'], ['omega', 'omega'], ['pi', 'pi']
+      ];
+      pairs.forEach(([cmd, plain]) => {
+        s = s.split(BS + cmd).join(plain);
+      });
+      return s;
+    }
+
+    function replaceLatexSqrt(s) {
+      const BS = String.fromCharCode(92);
+      while (s.includes(BS + 'sqrt')) {
+        const idx = s.indexOf(BS + 'sqrt');
+        const group = readBrace(s, idx + 5);
+        if (!group) break;
+        s = s.slice(0, idx) + 'sqrt(' + group.content + ')' + s.slice(group.end + 1);
+      }
+      return s;
+    }
+
+    function normalizeLatexSpacesAsMultiplication(s) {
+      let out = '';
+      for (let i = 0; i < s.length; i++) {
+        const ch = s[i];
+        if (!isSpace(ch)) { out += ch; continue; }
+        let j = i;
+        while (j < s.length && isSpace(s[j])) j++;
+        const prev = out[out.length - 1] || '';
+        const next = s[j] || '';
+        if (canEndFactorChar(prev) && canStartFactorChar(next)) out += '*';
+        i = j - 1;
+      }
+      return out;
+    }
+
+    function replaceLatexFractions(s) {
+      while (s.includes('\\frac')) {
+        const idx = s.indexOf('\\frac');
+        const first = readBrace(s, idx + 5);
+        if (!first) break;
+        const second = readBrace(s, first.end + 1);
+        if (!second) break;
+        s = s.slice(0, idx) + '((' + first.content + ')/(' + second.content + '))' + s.slice(second.end + 1);
+      }
+      return s;
+    }
+
+    function readBrace(s, start) {
+      if (s[start] !== '{') return null;
+      let depth = 0;
+      for (let i = start; i < s.length; i++) {
+        if (s[i] === '{') depth++;
+        if (s[i] === '}') depth--;
+        if (depth === 0) return { content: s.slice(start + 1, i), end: i };
+      }
+      return null;
+    }
+
+    function insertImplicitMultiplication(s) {
+      const funcs = new Set(['sin', 'cos', 'tan', 'sqrt', 'log', 'exp']);
+      const tokens = tokenizeExpression(s);
+      const out = [];
+      for (let i = 0; i < tokens.length; i++) {
+        const cur = tokens[i];
+        const next = tokens[i + 1];
+        out.push(cur);
+        if (next && needsMultiply(cur, next, funcs)) out.push('*');
+      }
+      return out.join('');
+    }
+
+    function tokenizeExpression(s) {
+      const tokens = [];
+      let i = 0;
+      while (i < s.length) {
+        const ch = s[i];
+        if ('+-*/^=(),'.includes(ch)) { tokens.push(ch); i++; continue; }
+        if (isDigitOrDot(ch)) {
+          let j = i + 1;
+          while (j < s.length && isDigitOrDot(s[j])) j++;
+          tokens.push(s.slice(i, j));
+          i = j;
+          continue;
+        }
+        if (isLetter(ch) || ch === '_') {
+          let j = i + 1;
+          while (j < s.length && (isLetter(s[j]) || isDigit(s[j]) || s[j] === '_')) j++;
+          tokens.push(s.slice(i, j));
+          i = j;
+          continue;
+        }
+        i++;
+      }
+      return tokens;
+    }
+
+    function needsMultiply(a, b, funcs) {
+      if (!a || !b) return false;
+      if (['+', '-', '*', '/', '^', '=', '(', ','].includes(a)) return false;
+      if (['+', '-', '*', '/', '^', '=', ')', ','].includes(b)) return false;
+      if (funcs.has(a) && b === '(') return false;
+      return canEndFactorToken(a) && canStartFactorToken(b);
+    }
+
+    function canEndFactorToken(t) {
+      return t === ')' || isDigit(t[t.length - 1]) || isLetter(t[t.length - 1]) || t[t.length - 1] === '_';
+    }
+
+    function canStartFactorToken(t) {
+      return t === '(' || isDigit(t[0]) || isLetter(t[0]) || t[0] === '_';
+    }
+
+    function canEndFactorChar(ch) {
+      return ch === ')' || isDigit(ch) || isLetter(ch) || ch === '_';
+    }
+
+    function canStartFactorChar(ch) {
+      return ch === '(' || isDigit(ch) || isLetter(ch) || ch === '_';
+    }
+
+    function isSpace(ch) {
+      return ch === ' ' || ch === String.fromCharCode(10) || ch === String.fromCharCode(9) || ch === String.fromCharCode(13);
+    }
+
+    function isDigit(ch) { return ch >= '0' && ch <= '9'; }
+    function isDigitOrDot(ch) { return isDigit(ch) || ch === '.'; }
+    function isLetter(ch) {
+      if (!ch) return false;
+      const c = ch.charCodeAt(0);
+      return (c >= 65 && c <= 90) || (c >= 97 && c <= 122);
+    }
+
+    function convertIfLatex() {
+      const inputType = document.getElementById('inputType').value;
+      if (inputType !== 'latex') return;
+      try {
+        const converted = preprocessLatex(document.getElementById('formula').value);
+        document.getElementById('convertedOutput').textContent = converted;
+      } catch (e) {
+        document.getElementById('convertedOutput').textContent = '转换失败：' + e.message;
+      }
+    }
+
+    function getCurrentFormulaText() {
+      const raw = document.getElementById('formula').value;
+      if (document.getElementById('inputType').value === 'latex') {
+        const converted = preprocessLatex(raw);
+        document.getElementById('convertedOutput').textContent = converted;
+        return converted;
+      }
+      document.getElementById('convertedOutput').textContent = raw;
+      return raw;
+    }
+
+    function splitFormula(input) {
+      const raw = input.trim();
+      if (!raw) throw new Error('请输入公式。');
+      const parts = raw.split('=');
+      if (parts.length === 1) return { lhs: 'y', rhs: parts[0].trim() };
+      if (parts.length !== 2) throw new Error('公式中只能有一个等号。');
+      const lhs = parts[0].trim();
+      const rhs = parts[1].trim();
+      if (!lhs || !rhs) throw new Error('等号左右两边都不能为空。');
+      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(lhs)) throw new Error('结果变量名只能由字母、数字、下划线组成，且不能以数字开头。');
+      return { lhs, rhs };
+    }
+
+    function getVariables(node) {
+      const symbols = new Set();
+      const builtIns = new Set(['pi', 'e', 'i', 'Infinity', 'NaN']);
+      const functions = new Set(['sin','cos','tan','sqrt','log','exp']);
+      node.traverse(function(n) {
+        if (n.isSymbolNode && !builtIns.has(n.name) && !functions.has(n.name)) {
+          symbols.add(n.name);
+        }
+      });
+      return Array.from(symbols).sort();
+    }
+
+    function toTex(expr) {
+      try {
+        const tex = math.parse(expr).toTex({ parenthesis: 'keep', implicit: 'show' });
+        return prettifyGreekTex(tex);
+      }
+      catch { return prettifyGreekTex(expr); }
+    }
+
+    function prettifyGreekTex(tex) {
+      tex = tex.replace(/\\_/g, '_');
+      tex = tex.replace(/\\mathrm\{([A-Za-z]+)_([A-Za-z0-9]+)\}/g, function(_, base, sub) { return displayName(base + '_' + sub); });
+      tex = tex.replace(/\\operatorname\{([A-Za-z]+)_([A-Za-z0-9]+)\}/g, function(_, base, sub) { return displayName(base + '_' + sub); });
+      tex = tex.replace(/\\mathrm\{([A-Za-z]+)\}/g, function(_, base) { return displayName(base); });
+      tex = tex.replace(/\\operatorname\{([A-Za-z]+)\}/g, function(_, base) { return displayName(base); });
+      const map = greekDisplayMap();
+      const names = Object.keys(map).sort((a, b) => b.length - a.length);
+      const BS = String.fromCharCode(92);
+      let out = '';
+
+      for (let i = 0; i < tex.length; i++) {
+        const ch = tex[i];
+        if (ch === BS) {
+          const knownCommands = ['operatorname', 'mathrm', 'frac', 'sqrt', 'left', 'right', 'cdot', 'partial', 'alpha', 'beta', 'gamma', 'delta', 'epsilon', 'theta', 'lambda', 'mu', 'rho', 'sigma', 'omega', 'Delta'];
+          let matchedCommand = '';
+          for (const cmd of knownCommands) {
+            if (tex.slice(i + 1, i + 1 + cmd.length) === cmd) {
+              matchedCommand = cmd;
+              break;
+            }
+          }
+          if (matchedCommand) {
+            out += BS + matchedCommand;
+            i += matchedCommand.length;
+          } else {
+            out += ch;
+            i++;
+            while (i < tex.length && isLetter(tex[i])) {
+              out += tex[i];
+              i++;
+            }
+            i--;
+          }
+          continue;
+        }
+
+        let replaced = false;
+        for (const name of names) {
+          if (tex.slice(i, i + name.length) === name) {
+            const before = i === 0 ? '' : tex[i - 1];
+            const after = tex[i + name.length] || '';
+            const boundaryBefore = !isLetter(before) && !isDigit(before) && before !== '_';
+            const boundaryAfter = after === '_' || (!isLetter(after) && !isDigit(after));
+            if (boundaryBefore && boundaryAfter) {
+              out += map[name];
+              i += name.length - 1;
+              replaced = true;
+              break;
+            }
+          }
+        }
+        if (!replaced) out += ch;
+      }
+      out = fixLatexCommandVariableGlue(out);
+      return out;
+    }
+
+    function fixLatexCommandVariableGlue(tex) {
+      const BS = String.fromCharCode(92);
+      const commandsNeedingSpace = ['cdot', 'times'];
+      commandsNeedingSpace.forEach(cmd => {
+        const glued = BS + cmd;
+        let fixed = '';
+        for (let i = 0; i < tex.length; i++) {
+          if (tex.slice(i, i + glued.length) === glued) {
+            fixed += glued;
+            i += glued.length - 1;
+            const next = tex[i + 1] || '';
+            if (next && isLetter(next)) fixed += ' ';
+          } else {
+            fixed += tex[i];
+          }
+        }
+        tex = fixed;
+      });
+      return tex;
+    }
+
+    function greekDisplayMap() {
+      const BS = String.fromCharCode(92);
+      return {
+        alpha: BS + 'alpha', beta: BS + 'beta', gamma: BS + 'gamma', delta: BS + 'delta', epsilon: BS + 'epsilon',
+        theta: BS + 'theta', lambda: BS + 'lambda', mu: BS + 'mu', rho: BS + 'rho', sigma: BS + 'sigma', omega: BS + 'omega', Delta: BS + 'Delta'
+      };
+    }
+
+    function displayName(name) {
+      const map = greekDisplayMap();
+      if (name.includes('_')) {
+        const idx = name.indexOf('_');
+        const base = name.slice(0, idx);
+        const sub = name.slice(idx + 1);
+        const baseDisplay = map[base] || base;
+        return `${baseDisplay}_{${sub}}`;
+      }
+      return map[name] || name;
+    }
+
+    function plainDisplayName(name) {
+      const greek = {
+        alpha: 'α', beta: 'β', gamma: 'γ', delta: 'δ', epsilon: 'ε',
+        theta: 'θ', lambda: 'λ', mu: 'μ', rho: 'ρ', sigma: 'σ', omega: 'ω', Delta: 'Δ'
+      };
+      const subs = {
+        '0':'₀','1':'₁','2':'₂','3':'₃','4':'₄','5':'₅','6':'₆','7':'₇','8':'₈','9':'₉',
+        '+':'₊','-':'₋','=':'₌','(':'₍',')':'₎',
+        'a':'ₐ','e':'ₑ','h':'ₕ','i':'ᵢ','j':'ⱼ','k':'ₖ','l':'ₗ','m':'ₘ','n':'ₙ','o':'ₒ','p':'ₚ','r':'ᵣ','s':'ₛ','t':'ₜ','u':'ᵤ','v':'ᵥ','x':'ₓ'
+      };
+      if (name.includes('_')) {
+        const idx = name.indexOf('_');
+        const base = name.slice(0, idx);
+        const sub = name.slice(idx + 1);
+        const baseText = greek[base] || base;
+        const subText = sub.split('').map(ch => subs[ch] || ch).join('');
+        return baseText + subText;
+      }
+      return greek[name] || name;
+    }
+
+    function renderLatex(elId, tex, displayMode = true) {
+      const el = document.getElementById(elId);
+      try { katex.render(tex, el, { throwOnError: false, displayMode }); }
+      catch { el.textContent = tex; }
+    }
+
+    function getCovPairs(vars) {
+      const pairs = [];
+      for (let i = 0; i < vars.length; i++) {
+        for (let j = i + 1; j < vars.length; j++) pairs.push([vars[i], vars[j]]);
+      }
+      return pairs;
+    }
+
+    function analyzeFormula() {
+      showError('');
+      try {
+        const { lhs, rhs } = splitFormula(getCurrentFormulaText());
+        const node = math.parse(rhs);
+        const variables = getVariables(node).filter(v => v !== lhs);
+        if (variables.length === 0) throw new Error('没有识别到可求导的输入变量。');
+
+        const derivatives = {};
+        variables.forEach(v => {
+          const symbol = new math.SymbolNode(v);
+          derivatives[v] = math.derivative(node, symbol).toString();
+        });
+
+        const terms = variables.map(v => `((${derivatives[v]}) * u_${v})^2`);
+        const covPairs = getCovPairs(variables);
+        if (document.getElementById('covMode').value === 'covariance') {
+          covPairs.forEach(([a,b]) => {
+            terms.push(`2 * (${derivatives[a]}) * (${derivatives[b]}) * cov_${a}_${b}`);
+          });
+        }
+        const uncertaintyExpr = `sqrt(${terms.join(' + ')})`;
+        const wordExpr = buildWordEquation(lhs, rhs, variables, derivatives, covPairs);
+        state = { lhs, rhs, variables, derivatives, uncertaintyExpr, wordExpr, covPairs };
+        buildVariableInputs();
+        buildCovInputs();
+        updateOutputs();
+      } catch (e) { showError(e.message || String(e)); }
+    }
+
+    function buildVariableInputs() {
+      const wrap = document.getElementById('variables');
+      wrap.innerHTML = '';
+      state.variables.forEach(v => {
+        const item = document.createElement('div');
+        item.className = 'var-item';
+
+        const nameBox = document.createElement('div');
+        nameBox.className = 'var-name';
+        katex.render(displayName(v), nameBox, { throwOnError: false, displayMode: false });
+
+        const valInput = document.createElement('input');
+        valInput.id = `val_${v}`;
+        valInput.placeholder = `${plainDisplayName(v)} 的值`;
+        valInput.type = 'number';
+        valInput.step = 'any';
+
+        const uncInput = document.createElement('input');
+        uncInput.id = `unc_${v}`;
+        uncInput.placeholder = `u(${plainDisplayName(v)})`;
+        uncInput.type = 'number';
+        uncInput.step = 'any';
+
+        item.appendChild(nameBox);
+        item.appendChild(valInput);
+        item.appendChild(uncInput);
+        wrap.appendChild(item);
+      });
+    }
+
+    function buildCovInputs() {
+      const wrap = document.getElementById('covariances');
+      wrap.innerHTML = '';
+      state.covPairs.forEach(([a,b]) => {
+        const item = document.createElement('div');
+        item.className = 'cov-item';
+
+        const nameBox = document.createElement('div');
+        nameBox.className = 'var-name';
+        katex.render(`\\operatorname{cov}(${displayName(a)},${displayName(b)})`, nameBox, { throwOnError: false, displayMode: false });
+
+        const input = document.createElement('input');
+        input.id = `cov_${a}_${b}`;
+        input.placeholder = '协方差数值，独立则填 0';
+        input.type = 'number';
+        input.step = 'any';
+        input.value = '0';
+
+        item.appendChild(nameBox);
+        item.appendChild(input);
+        wrap.appendChild(item);
+      });
+    }
+
+    function toggleCovariance() {
+      document.getElementById('covarianceBox').style.display = document.getElementById('covMode').value === 'covariance' ? 'block' : 'none';
+      if (state.variables.length) analyzeFormula();
+    }
+
+    function buildUncertaintyTex(isRelative = false) {
+      const mainTerms = state.variables.map(v => {
+        return `\left(${toTex(state.derivatives[v])}\cdot u(${displayName(v)})\right)^2`;
+      });
+
+      const covTerms = [];
+      if (document.getElementById('covMode').value === 'covariance') {
+        state.covPairs.forEach(([a, b]) => {
+          covTerms.push(`2\left(${toTex(state.derivatives[a])}\right)\left(${toTex(state.derivatives[b])}\right)\operatorname{cov}(${displayName(a)},${displayName(b)})`);
+        });
+      }
+
+      const inside = mainTerms.concat(covTerms).join(' + ');
+      const root = `\sqrt{${inside}}`;
+      if (isRelative) {
+        return `u_r(${displayName(state.lhs)}) = \frac{u(${displayName(state.lhs)})}{${displayName(state.lhs)}} = \frac{${root}}{${toTex(state.rhs)}}`;
+      }
+      return `u(${displayName(state.lhs)}) = ${root}`;
+    }
+
+    function updateOutputs() {
+      renderLatex('originOutput', `${displayName(state.lhs)} = ${toTex(state.rhs)}`);
+      const mode = document.getElementById('mode').value;
+      renderLatex('uncertaintyOutput', buildUncertaintyTex(mode === 'relative'));
+      document.getElementById('wordOutput').textContent = state.wordExpr;
+      renderDerivativeTable();
+    }
+
+    function renderDerivativeTable() {
+      const box = document.getElementById('derivativeOutput');
+      box.innerHTML = '';
+
+      const table = document.createElement('table');
+      const thead = document.createElement('thead');
+      thead.innerHTML = '<tr><th>变量</th><th>偏导数</th></tr>';
+      const tbody = document.createElement('tbody');
+
+      state.variables.forEach(v => {
+        const tr = document.createElement('tr');
+        const tdVar = document.createElement('td');
+        const tdDer = document.createElement('td');
+        tdVar.textContent = plainDisplayName(v);
+        const tex = `\\frac{\\partial ${displayName(state.lhs)}}{\\partial ${displayName(v)}} = ${toTex(state.derivatives[v])}`;
+        katex.render(tex, tdDer, { throwOnError: false, displayMode: false });
+        tr.appendChild(tdVar);
+        tr.appendChild(tdDer);
+        tbody.appendChild(tr);
+      });
+
+      table.appendChild(thead);
+      table.appendChild(tbody);
+      box.appendChild(table);
+    }
+
+    function buildWordEquation(lhs, rhs, variables, derivatives, covPairs) {
+      const base = variables.map(v => `(∂${displayName(lhs)}/∂${displayName(v)} · u(${displayName(v)}))^2`).join(' + ');
+      let cov = '';
+      if (document.getElementById('covMode').value === 'covariance') {
+        cov = covPairs.map(([a,b]) => ` + 2(∂${displayName(lhs)}/∂${displayName(a)})(∂${displayName(lhs)}/∂${displayName(b)})cov(${displayName(a)},${displayName(b)})`).join('');
+      }
+      return `u(${displayName(lhs)}) = sqrt(${base}${cov})`;
+    }
+
+    function calculateNumeric() {
+      showError('');
+      try {
+        if (!state.variables.length) analyzeFormula();
+        const scope = {};
+        state.variables.forEach(v => {
+          const val = document.getElementById(`val_${v}`).value;
+          const unc = document.getElementById(`unc_${v}`).value;
+          if (val === '' || unc === '') throw new Error(`请填写 ${plainDisplayName(v)} 的值和 u(${plainDisplayName(v)})。`);
+          scope[v] = Number(val);
+          scope[`u_${v}`] = Number(unc);
+          if (!Number.isFinite(scope[v]) || !Number.isFinite(scope[`u_${v}`])) throw new Error(`${plainDisplayName(v)} 的输入不是有效数字。`);
+        });
+        if (document.getElementById('covMode').value === 'covariance') {
+          state.covPairs.forEach(([a,b]) => {
+            const id = `cov_${a}_${b}`;
+            scope[id] = Number(document.getElementById(id).value || 0);
+          });
+        }
+        const y = math.evaluate(state.rhs, scope);
+        const uy = math.evaluate(state.uncertaintyExpr, scope);
+        const ur = Math.abs(uy / y);
+        const digits = Number(document.getElementById('roundDigits').value) || 6;
+        document.getElementById('numericOutput').innerHTML = `<p><strong>${plainDisplayName(state.lhs)}</strong> = ${formatNumber(y, digits)}</p><p><strong>u(${plainDisplayName(state.lhs)})</strong> = ${formatNumber(uy, digits)}</p><p><strong>相对不确定度 u_r(${plainDisplayName(state.lhs)})</strong> = ${formatNumber(ur, digits)}，即 ${(ur * 100).toFixed(Math.min(digits, 6))}%</p>`;
+      } catch (e) { showError(e.message || String(e)); }
+    }
+
+    function formatNumber(x, digits) {
+      if (!Number.isFinite(x)) return String(x);
+      return Number(x).toPrecision(digits).replace(/\.0+$/,'');
+    }
+
+    function copyPlainResult() {
+      const lines = [`原始公式：${state.lhs} = ${state.rhs}`, `不确定度公式：u(${state.lhs}) = ${state.uncertaintyExpr}`, '偏导数：'];
+      state.variables.forEach(v => lines.push(`d${state.lhs}/d${v} = ${state.derivatives[v]}`));
+      navigator.clipboard.writeText(lines.join('\n'));
+      alert('已复制普通文本');
+    }
+
+    function copyWordEquation() {
+      navigator.clipboard.writeText(state.wordExpr || '请先生成公式');
+      alert('已复制 Word 公式文本。粘贴到 Word 后，可用“插入-公式”或 Alt+= 后粘贴。');
+    }
+
+    async function exportPNG() {
+      const canvas = await html2canvas(document.getElementById('reportArea'), { scale: 2, backgroundColor: '#ffffff' });
+      const a = document.createElement('a');
+      a.href = canvas.toDataURL('image/png');
+      a.download = 'uncertainty_report.png';
+      a.click();
+    }
+
+    async function exportPDF() {
+      const canvas = await html2canvas(document.getElementById('reportArea'), { scale: 2, backgroundColor: '#ffffff' });
+      const img = canvas.toDataURL('image/png');
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageW = 210;
+      const imgW = 190;
+      const imgH = canvas.height * imgW / canvas.width;
+      pdf.addImage(img, 'PNG', 10, 10, imgW, imgH);
+      pdf.save('uncertainty_report.pdf');
+    }
+
+    function clearAll() {
+      document.getElementById('formula').value = '';
+      document.getElementById('variables').innerHTML = '';
+      document.getElementById('covariances').innerHTML = '';
+      ['originOutput','uncertaintyOutput','wordOutput','derivativeOutput','numericOutput','convertedOutput'].forEach(id => document.getElementById(id).textContent = '等待生成……');
+      showError('');
+      state = { lhs: 'y', rhs: '', variables: [], derivatives: {}, uncertaintyExpr: '', wordExpr: '', covPairs: [] };
+    }
+
+    function fillExample(type) {
+      document.getElementById('inputType').value = 'latex';
+      const examples = {
+        density: 'rho = \\frac{m}{V}',
+        spring: 'k = \\frac{F}{x}',
+        surface: 'gamma = \\frac{k*x}{2*L}'
+      };
+      document.getElementById('formula').value = examples[type];
+      analyzeFormula();
+    }
+
+    document.getElementById('mode').addEventListener('change', () => { if (state.variables.length) updateOutputs(); });
+    document.getElementById('formula').addEventListener('input', convertIfLatex);
+    document.getElementById('inputType').value = 'latex';
+    toggleCovariance();
+    analyzeFormula();
+  </script>
+</body>
+</html>
